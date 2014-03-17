@@ -18,23 +18,20 @@ var sphere = Vec.sphere([0,0,0],1);
 
 var rot = 0;
 
+var gamma = 0.7;
+
 
 
 m.startLoop(function () {
 
 	img.reset();
 
-	var position = Vec.vector(0,0.6,2);
+	var position = Vec.vector(0,0.5,2.3);
 
 	position = Vec.vecRotateY(position, rot);
 
 	rot += 0.006;
 	if (rot > 2*Math.PI) rot -= 2*Math.PI;
-
-	var time = new Date();
-	time = (time.getTime()/86400000 + 1/24);
-	time = time - Math.floor(time);
-	time = time*2*Math.PI;
 
 	for (var y = 0; y < heightBig; y++) {
 		for (var x = 0; x < widthBig; x++) {
@@ -55,14 +52,14 @@ m.startLoop(function () {
 					hitInfo.normal[2]
 				);
 
-				sunStrength = -Math.cos(sunStrength+time);
+				sunStrength = -Math.cos(sunStrength+4.0-rot);
 				if (sunStrength < 0) sunStrength = 0;
 				var brightness = sunStrength;
 
 				c = [
-					textureDay[ti+0]*brightness,
-					textureDay[ti+1]*brightness,
-					textureDay[ti+2]*brightness
+					Math.pow(textureDay[ti+0]*brightness/255, gamma)*255,
+					Math.pow(textureDay[ti+1]*brightness/255, gamma)*255,
+					Math.pow(textureDay[ti+2]*brightness/255, gamma)*255
 				];
 			}
 			img.setSubPixel(x,y,c);
