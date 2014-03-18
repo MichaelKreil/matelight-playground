@@ -16,35 +16,45 @@ var img = new Image();
 
 var sphere = Vec.sphere([0,0,0],1);
 
-var rot = 0;
+var textureRotation = 3.14;
 
 var gamma = 0.7;
 
-
+var camRotationY = 0;
+var camRotationX = 0;
+var camShiftX = 0;
+var camShiftY = 0.5;
+var camShiftZ = 2.2;
 
 m.startLoop(function () {
 
 	img.reset();
 
-	var position = Vec.vector(0,0.5,2.3);
+	var position = Vec.vector(camShiftX, camShiftY, camShiftZ);
 
-	position = Vec.vecRotateY(position, rot);
+	position = Vec.vecRotateY(position, camRotationY);
+	position = Vec.vecRotateX(position, camRotationX);
 
-	rot += 0.006;
-	if (rot > 2*Math.PI) rot -= 2*Math.PI;
+	textureRotation += 0.006;
+	if (textureRotation > 2*Math.PI) textureRotation -= 2*Math.PI;
 
 	for (var y = 0; y < heightBig; y++) {
 		for (var x = 0; x < widthBig; x++) {
 			var direction = Vec.vector(x - widthBig/2, heightBig/2-y, -40*aa);
-			direction = Vec.vecRotateY(direction, rot);
+
+			direction = Vec.vecRotateY(direction, camRotationY);
+			direction = Vec.vecRotateX(direction, camRotationX);
+			
 			var c = [0,0,0];
 			var hitInfo = Vec.hitsSphere(position, direction, sphere);
 			if (hitInfo) {
 				var tx = hitInfo.texturePos[0]/Math.PI;
 				var ty = hitInfo.texturePos[1]/Math.PI;
 
-				tx = Math.round(textureWidth*( 1+(tx+1)/2)) % textureWidth;
-				ty = Math.round(textureHeight*(1+(ty))) % textureHeight;
+				tx = tx/2 + textureRotation/(2*Math.PI);
+				ty = ty + 1;
+				tx = Math.round(textureWidth *tx) % textureWidth;
+				ty = Math.round(textureHeight*ty) % textureHeight;
 				var ti = (tx+ty*textureWidth)*3;
 				
 				var sunStrength = Math.atan2(
@@ -52,7 +62,7 @@ m.startLoop(function () {
 					hitInfo.normal[2]
 				);
 
-				sunStrength = -Math.cos(sunStrength+4.0-rot);
+				sunStrength = -Math.cos(sunStrength+4.0);
 				if (sunStrength < 0) sunStrength = 0;
 				var brightness = sunStrength;
 
@@ -160,11 +170,18 @@ function VecLib() {
 	me.vecScale = function (v0, s) {
 		return [ v0[0]*s, v0[1]*s, v0[2]*s ];
 	}
+	me.vecRotateX = function (v, a) {
+		return [
+			v[0],
+			v[1]*Math.cos(a) + v[2]*Math.sin(a),
+			v[2]*Math.cos(a) - v[1]*Math.sin(a)
+		]
+	}
 	me.vecRotateY = function (v, a) {
 		return [
 			v[0]*Math.cos(a) + v[2]*Math.sin(a),
 			v[1],
-			-v[0]*Math.sin(a) + v[2]*Math.cos(a)
+			v[2]*Math.cos(a) - v[0]*Math.sin(a)
 		]
 	}
 
