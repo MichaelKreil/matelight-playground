@@ -52,6 +52,9 @@
 							//console.log(JSON.stringify(data));
 							socket.emit('add', data)
 						}
+						if (event.touches.length == 3) {
+							socket.emit('set', false);
+						}
 					})()
 
 					touches = [];
