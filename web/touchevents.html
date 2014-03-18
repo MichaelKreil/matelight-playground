@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="de">
+	<head>
+		<title>MateEarth</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<link rel="apple-touch-icon" href="icon.png">
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+			var socket;
+
+			function init() {
+				console.log('init');
+				socket = io.connect('http://10.0.0.235:8080');
+				//socket.emit('set', {});
+				var touches = [];
+				var body = document.getElementById('body');
+				body.addEventListener('touchstart', function (event) {
+					touches = event.touches;
+				})
+				body.addEventListener('touchend', function (event) {
+					touches = [];
+				})
+				body.addEventListener('touchmove', function (event) {
+					event.preventDefault();
+
+					(function () {
+						if (event.touches.length == 1) {
+							if (touches.length != 1) return false;
+							var dx = touches[0].pageX - event.touches[0].pageX;
+							var dy = touches[0].pageY - event.touches[0].pageY;
+							var data = {
+								camRotationY:  dx/300,
+								camRotationX: -dy/300,
+							};
+							//console.log(data);
+							socket.emit('add', data)
+						}
+						if (event.touches.length == 2) {
+							if (touches.length != 2) return false;
+							var dx = touches[0].pageX+touches[1].pageX-event.touches[0].pageX-event.touches[1].pageX;
+							var dy = touches[0].pageY+touches[1].pageY-event.touches[0].pageY-event.touches[1].pageY;
+							var dz1 = Math.sqrt(sqr(touches[0].pageX - touches[1].pageX) + sqr(touches[0].pageY - touches[1].pageY));
+							var dz2 = Math.sqrt(sqr(event.touches[0].pageX - event.touches[1].pageX) + sqr(event.touches[0].pageY - event.touches[1].pageY));
+							var dz = dz1-dz2;
+							var data = {
+								camShiftX:  dx/600,
+								camShiftY: -dy/600,
+								camShiftZ:  dz/200,
+							};
+							//console.log(JSON.stringify(data));
+							socket.emit('add', data)
+						}
+					})()
+
+					touches = [];
+					for (var i = 0; i < event.touches.length; i++) {
+						touches[i] = {
+							pageX: event.touches[i].pageX,
+							pageY: event.touches[i].pageY
+						};
+					}
+
+					return false;
+				}, false)
+			}
+
+			function sqr(x) {
+				return x*x;
+			}
+		</script>
+		<style>
+			html, body {
+				height: 100%;
+				margin: 0;
+				background: black;
+			}
+		</style>
+	</head>
+	<body onload="init()" id="body">
+	</body>
+</html>

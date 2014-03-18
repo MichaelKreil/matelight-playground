@@ -1,3 +1,6 @@
+var app = require('http').createServer(handler);
+var io = require('socket.io').listen(app, {log:false});
+
 var fs = require('fs');
 var m = new MateLight();
 var Vec = new VecLib();
@@ -15,25 +18,73 @@ var textureHeight = 512;
 var img = new Image();
 
 var sphere = Vec.sphere([0,0,0],1);
-
 var textureRotation = 3.14;
-
 var gamma = 0.7;
+var pi2 = Math.PI/2;
 
-var camRotationY = 0;
-var camRotationX = 0;
-var camShiftX = 0;
-var camShiftY = 0.5;
-var camShiftZ = 2.2;
+var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
+
+app.listen(8080);
+
+function handler (req, res) {
+	var filename = 'touchevents.html';
+	if (req.url == '/icon.png') filename = 'icon.png';
+
+	fs.readFile(
+		__dirname + '/web/' + filename,
+		function (err, data) {
+			if (err) {
+				res.writeHead(500);
+				return res.end('Error loading index.html');
+			}
+
+			res.writeHead(200);
+			res.end(data);
+		}
+	);
+}
+
+io.sockets.on('connection', function (socket) {
+	socket.on('set', function (data) {
+		setData(data);
+	});
+	socket.on('add', function (data) {
+		setData(data, true);
+	});
+	socket.on('reset', function (data) {
+		setData();
+	});
+});
+
+function setData(data, add) {
+	if (!data) data = {};
+	if (add) {
+		camRotationY += data.camRotationY || 0;
+		camRotationX += data.camRotationX || 0;
+		camShiftX    += data.camShiftX    || 0;
+		camShiftY    += data.camShiftY    || 0;
+		camShiftZ    += data.camShiftZ    || 0;
+	} else {
+		camRotationY = data.camRotationY || 0.0;
+		camRotationX = data.camRotationX || 0.0;
+		camShiftX    = data.camShiftX    || 0.0;
+		camShiftY    = data.camShiftY    || 0.5;
+		camShiftZ    = data.camShiftZ    || 0.9;
+	}
+	if (camRotationX < -pi2) camRotationX = -pi2;
+	if (camRotationX >  pi2) camRotationX =  pi2;
+}
+
+setData();
 
 m.startLoop(function () {
 
 	img.reset();
 
-	var position = Vec.vector(camShiftX, camShiftY, camShiftZ);
+	var position = Vec.vector(camShiftX, camShiftY, Math.exp(camShiftZ));
 
-	position = Vec.vecRotateY(position, camRotationY);
 	position = Vec.vecRotateX(position, camRotationX);
+	position = Vec.vecRotateY(position, camRotationY);
 
 	textureRotation += 0.006;
 	if (textureRotation > 2*Math.PI) textureRotation -= 2*Math.PI;
@@ -42,8 +93,8 @@ m.startLoop(function () {
 		for (var x = 0; x < widthBig; x++) {
 			var direction = Vec.vector(x - widthBig/2, heightBig/2-y, -40*aa);
 
-			direction = Vec.vecRotateY(direction, camRotationY);
 			direction = Vec.vecRotateX(direction, camRotationX);
+			direction = Vec.vecRotateY(direction, camRotationY);
 			
 			var c = [0,0,0];
 			var hitInfo = Vec.hitsSphere(position, direction, sphere);
@@ -77,7 +128,7 @@ m.startLoop(function () {
 	}
 
 	m.setBuffer(img.getBuffer());
-}, 30)
+}, 10)
 
 
 
