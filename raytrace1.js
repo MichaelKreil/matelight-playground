@@ -58,18 +58,19 @@ io.sockets.on('connection', function (socket) {
 
 function setData(data, add) {
 	if (!data) data = {};
+	var factor = Math.exp(camShiftZ);
 	if (add) {
-		camRotationY += data.camRotationY || 0;
-		camRotationX += data.camRotationX || 0;
-		camShiftX    += data.camShiftX    || 0;
-		camShiftY    += data.camShiftY    || 0;
-		camShiftZ    += data.camShiftZ    || 0;
+		camRotationY += factor*data.camRotationY || 0;
+		camRotationX += factor*data.camRotationX || 0;
+		camShiftX    += factor*data.camShiftX    || 0;
+		camShiftY    += factor*data.camShiftY    || 0;
+		camShiftZ    += factor*data.camShiftZ    || 0;
 	} else {
 		camRotationY = data.camRotationY || 0.0;
 		camRotationX = data.camRotationX || 0.0;
 		camShiftX    = data.camShiftX    || 0.0;
 		camShiftY    = data.camShiftY    || 0.5;
-		camShiftZ    = data.camShiftZ    || 0.9;
+		camShiftZ    = data.camShiftZ    || 0.2;
 	}
 	if (camRotationX < -pi2) camRotationX = -pi2;
 	if (camRotationX >  pi2) camRotationX =  pi2;
