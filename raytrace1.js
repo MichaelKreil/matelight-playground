@@ -81,12 +81,12 @@ m.startLoop(function () {
 
 	img.reset();
 
-	var position = Vec.vector(camShiftX, camShiftY, Math.exp(camShiftZ));
+	var position = Vec.vector(camShiftX, camShiftY, Math.exp(camShiftZ)+1);
 
 	position = Vec.vecRotateX(position, camRotationX);
 	position = Vec.vecRotateY(position, camRotationY);
 
-	textureRotation += 0.006;
+	textureRotation += Math.exp(camShiftZ-6);
 	if (textureRotation > 2*Math.PI) textureRotation -= 2*Math.PI;
 
 	for (var y = 0; y < heightBig; y++) {
