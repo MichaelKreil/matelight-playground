@@ -11,9 +11,9 @@ var aa = 6;
 var widthBig = width*aa;
 var heightBig = height*aa;
 
-var textureDay   = fs.readFileSync('data/earth.raw');
-var textureWidth = 1024;
-var textureHeight = 512;
+var textureDay   = fs.readFileSync('data/earth-4096.raw');
+var textureWidth  = 4096;
+var textureHeight = 2048;
 
 var img = new Image();
 
