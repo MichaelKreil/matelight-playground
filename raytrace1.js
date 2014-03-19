@@ -70,7 +70,7 @@ function setData(data, add) {
 		camRotationX = data.camRotationX || 0.0;
 		camShiftX    = data.camShiftX    || 0.0;
 		camShiftY    = data.camShiftY    || 0.5;
-		camShiftZ    = data.camShiftZ    || 0.2;
+		camShiftZ    = data.camShiftZ    || 0.235;
 	}
 	if (camRotationX < -pi2) camRotationX = -pi2;
 	if (camRotationX >  pi2) camRotationX =  pi2;
