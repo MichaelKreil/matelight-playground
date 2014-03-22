@@ -11,15 +11,15 @@ var aa = 6;
 var widthBig = width*aa;
 var heightBig = height*aa;
 
-var textureDay   = fs.readFileSync('data/earth-4096.raw');
-var textureWidth  = 4096;
-var textureHeight = 2048;
+var textureDay   = fs.readFileSync('data/earth.raw');
+var textureWidth  = 1024;
+var textureHeight =  512;
 
 var img = new Image();
 
 var sphere = Vec.sphere([0,0,0],1);
-var textureRotation = 3.14;
-var gamma = 0.7;
+var textureRotation = 0;
+var gamma = 1.2;
 var pi2 = Math.PI/2;
 
 var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
@@ -66,10 +66,10 @@ function setData(data, add) {
 		camShiftY    += factor*data.camShiftY    || 0;
 		camShiftZ    += factor*data.camShiftZ    || 0;
 	} else {
-		camRotationY = data.camRotationY || 0.0;
+		camRotationY = data.camRotationY || -1.2;
 		camRotationX = data.camRotationX || 0.0;
 		camShiftX    = data.camShiftX    || 0.0;
-		camShiftY    = data.camShiftY    || 0.5;
+		camShiftY    = data.camShiftY    || 0.3;
 		camShiftZ    = data.camShiftZ    || 0.235;
 	}
 	if (camRotationX < -pi2) camRotationX = -pi2;
@@ -80,22 +80,22 @@ setData();
 
 m.startLoop(function () {
 
+	textureRotation += Math.exp(camShiftZ-6.5);
+	if (textureRotation > 48*Math.PI) textureRotation -= 48*Math.PI;
+
 	img.reset();
 
 	var position = Vec.vector(camShiftX, camShiftY, Math.exp(camShiftZ)+1);
 
 	position = Vec.vecRotateX(position, camRotationX);
-	position = Vec.vecRotateY(position, camRotationY);
-
-	textureRotation += Math.exp(camShiftZ-6);
-	if (textureRotation > 2*Math.PI) textureRotation -= 2*Math.PI;
+	position = Vec.vecRotateY(position, camRotationY + textureRotation/2);
 
 	for (var y = 0; y < heightBig; y++) {
 		for (var x = 0; x < widthBig; x++) {
 			var direction = Vec.vector(x - widthBig/2, heightBig/2-y, -40*aa);
 
 			direction = Vec.vecRotateX(direction, camRotationX);
-			direction = Vec.vecRotateY(direction, camRotationY);
+			direction = Vec.vecRotateY(direction, camRotationY + textureRotation/2);
 			
 			var c = [0,0,0];
 			var hitInfo = Vec.hitsSphere(position, direction, sphere);
@@ -108,26 +108,46 @@ m.startLoop(function () {
 				tx = Math.round(textureWidth *tx) % textureWidth;
 				ty = Math.round(textureHeight*ty) % textureHeight;
 				var ti = (tx+ty*textureWidth)*3;
-				
-				var sunStrength = Math.atan2(
-					hitInfo.normal[0],
-					hitInfo.normal[2]
-				);
 
-				sunStrength = -Math.cos(sunStrength+4.0);
+				var color = [
+					textureDay[ti+0],
+					textureDay[ti+1],
+					textureDay[ti+2]
+				];
+
+				sunStrength = -hitInfo.normal[0];
 				if (sunStrength < 0) sunStrength = 0;
+
+				var reflectionVector = Vec.vecMult(direction, hitInfo.normal);
+				reflectionVector = Vec.vecScale(hitInfo.normal, reflectionVector);
+				reflectionVector = Vec.vecDiff(direction, reflectionVector);
+				reflectionVector = Vec.vecScale(reflectionVector, -2);
+				reflectionVector = Vec.vecAdd(direction, reflectionVector);
+
+				var sunReflection = reflectionVector[0]/Vec.vecLength(reflectionVector);
+				if (sunReflection < 0) sunReflection = 0;
+				sunReflection = Math.exp(-sqr((1-sunReflection)*20));
+
+				sunReflection *= 0.5;
+
+				var reflectionFactor = 1-(sqr(color[0]-0) + sqr(color[1]-95) + sqr(color[2]-153))/20000;
+				if (reflectionFactor < 0) reflectionFactor = 0;
+				sunReflection *= reflectionFactor;
+
 				var brightness = sunStrength;
 
 				c = [
-					Math.pow(textureDay[ti+0]*brightness/255, gamma)*255,
-					Math.pow(textureDay[ti+1]*brightness/255, gamma)*255,
-					Math.pow(textureDay[ti+2]*brightness/255, gamma)*255
+					Math.pow(color[0]*brightness/255 + sunReflection, gamma)*255,
+					Math.pow(color[1]*brightness/255 + sunReflection, gamma)*255,
+					Math.pow(color[2]*brightness/255 + sunReflection, gamma)*255
 				];
 			}
 			img.setSubPixel(x,y,c);
 		}
 	}
-
+	
+	//img.saveBigBuffer('frame');
+	//camRotationY -= Math.PI/8;
 	m.setBuffer(img.getBuffer());
 }, 10)
 
@@ -135,6 +155,8 @@ m.startLoop(function () {
 
 function Image() {
 	var me = this;
+
+	var frame = 0;
 
 	var buffer = new Buffer(width*height*3);
 	var bufferBig = new Array(widthBig*heightBig*3);
@@ -174,6 +196,24 @@ function Image() {
 					}
 				}
 			}
+		}
+	}
+
+	var appendBuffer = new Buffer(widthBig*heightBig*3*8);
+
+	me.saveBigBuffer = function (directory) {
+		var offset = frame * bufferBig.length;
+		for (var i = 0; i < bufferBig.length; i++) {
+			c = Math.round(bufferBig[i]);
+			if (c <   0) c =   0;
+			if (c > 255) c = 255;
+			appendBuffer[i+offset] = c;
+		}
+		
+		frame++;
+		if (frame >= 8) {
+			fs.writeFileSync(directory + '.raw', appendBuffer);
+			process.exit();
 		}
 	}
 
@@ -219,6 +259,9 @@ function VecLib() {
 	me.vecMult = function (v0, v1) {
 		return v0[0]*v1[0] + v0[1]*v1[1] + v0[2]*v1[2];
 	}
+	me.vecLength = function (v) {
+		return Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+	}
 	me.vecScale = function (v0, s) {
 		return [ v0[0]*s, v0[1]*s, v0[2]*s ];
 	}
@@ -227,6 +270,13 @@ function VecLib() {
 			v[0],
 			v[1]*Math.cos(a) + v[2]*Math.sin(a),
 			v[2]*Math.cos(a) - v[1]*Math.sin(a)
+		]
+	}
+	me.vecProd = function (v1, v2) {
+		return [
+			v1[1]*v2[2] - v1[2]*v2[1],
+			v1[2]*v2[0] - v1[0]*v2[2],
+			v1[0]*v2[1] - v1[1]*v2[0]
 		]
 	}
 	me.vecRotateY = function (v, a) {
@@ -307,4 +357,8 @@ function MateLight () {
 	};
 
 	return me;
+}
+
+function sqr(x) {
+	return x*x;
 }
