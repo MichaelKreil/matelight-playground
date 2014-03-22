@@ -19,7 +19,7 @@ var img = new Image();
 
 var sphere = Vec.sphere([0,0,0],1);
 var textureRotation = 0;
-var gamma = 1.2;
+var gamma = 0.8;
 var pi2 = Math.PI/2;
 
 var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
@@ -121,6 +121,7 @@ m.startLoop(function () {
 				var reflectionVector = Vec.vecMult(direction, hitInfo.normal);
 				reflectionVector = Vec.vecScale(hitInfo.normal, reflectionVector);
 				reflectionVector = Vec.vecDiff(direction, reflectionVector);
+				var sunsetFactor = Vec.vecLength(reflectionVector) / Vec.vecLength(direction);
 				reflectionVector = Vec.vecScale(reflectionVector, -2);
 				reflectionVector = Vec.vecAdd(direction, reflectionVector);
 
@@ -134,12 +135,16 @@ m.startLoop(function () {
 				if (reflectionFactor < 0) reflectionFactor = 0;
 				sunReflection *= reflectionFactor;
 
-				var brightness = sunStrength;
+				var brightness = 1-Math.cos(sunStrength*Math.PI/2);
+
+				var ssr = Math.max(0, 1-sunsetFactor*0.0);
+				var ssg = Math.max(0, 1-sunsetFactor*0.3);
+				var ssb = Math.max(0, 1-sunsetFactor*0.6);
 
 				c = [
-					Math.pow(color[0]*brightness/255 + sunReflection, gamma)*255,
-					Math.pow(color[1]*brightness/255 + sunReflection, gamma)*255,
-					Math.pow(color[2]*brightness/255 + sunReflection, gamma)*255
+					Math.pow((color[0]*brightness/255 + sunReflection*ssr)*ssr, gamma)*255,
+					Math.pow((color[1]*brightness/255 + sunReflection*ssg)*ssg, gamma)*255,
+					Math.pow((color[2]*brightness/255 + sunReflection*ssb)*ssb, gamma)*255
 				];
 			}
 			img.setSubPixel(x,y,c);
