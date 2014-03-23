@@ -12,16 +12,20 @@
 
 			function init() {
 				console.log('init');
-				socket = io.connect('http://10.0.0.235:8080');
-				//socket.emit('set', {});
+				//socket = io.connect('http://10.0.0.235:8080');
+				socket = io.connect('http://10.0.1.6:8080');
+
 				var touches = [];
 				var body = document.getElementById('body');
+
 				body.addEventListener('touchstart', function (event) {
 					touches = event.touches;
 				})
+
 				body.addEventListener('touchend', function (event) {
 					touches = [];
 				})
+
 				body.addEventListener('touchmove', function (event) {
 					event.preventDefault();
 
@@ -67,6 +71,23 @@
 
 					return false;
 				}, false)
+
+				var frame = 0;
+				var img1 = document.getElementById('img1');
+				var img2 = document.getElementById('img2');
+				setInterval(function () {
+					var file = Math.random();
+					file = '/frame.png?t='+file;
+
+					if (frame % 2 == 0) {
+						img1.src = file;
+						img2.style.zIndex = 100;
+					} else {
+						img2.src = file;
+						img2.style.zIndex = -100;
+					}
+					frame++;
+				}, 1000);
 			}
 
 			function sqr(x) {
@@ -78,9 +99,27 @@
 				height: 100%;
 				margin: 0;
 				background: black;
+				position: relative;
+			}
+			#img1, #img2 {
+				position: absolute;
+				top: 0px;
+				left: 0px;
+				right: 0px;
+				width: 100%;
+
+				image-rendering:optimizeSpeed;             /* Legal fallback */
+				image-rendering:-moz-crisp-edges;          /* Firefox        */
+				image-rendering:-o-crisp-edges;            /* Opera          */
+				image-rendering:-webkit-optimize-contrast; /* Safari         */
+				image-rendering:optimize-contrast;         /* CSS3 Proposed  */
+				image-rendering:crisp-edges;               /* CSS4 Proposed  */
+				image-rendering:pixelated;                 /* CSS4 Proposed  */
 			}
 		</style>
 	</head>
 	<body onload="init()" id="body">
+		<img id="img1"></img>
+		<img id="img2"></img>
 	</body>
 </html>

@@ -1,7 +1,9 @@
 var app = require('http').createServer(handler);
 var io = require('socket.io').listen(app, {log:false});
+var Canvas = require('canvas');
 
 var fs = require('fs');
+var url = require('url');
 var m = new MateLight();
 var Vec = new VecLib();
 
@@ -19,7 +21,7 @@ var img = new Image();
 
 var sphere = Vec.sphere([0,0,0],1);
 var textureRotation = 0;
-var gamma = 0.8;
+var gamma = 1.0;
 var pi2 = Math.PI/2;
 
 var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
@@ -27,21 +29,43 @@ var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
 app.listen(8080);
 
 function handler (req, res) {
-	var filename = 'touchevents.html';
-	if (req.url == '/icon.png') filename = 'icon.png';
+	var result = false;
+	var urlInfo = url.parse(req.url);
 
-	fs.readFile(
-		__dirname + '/web/' + filename,
-		function (err, data) {
-			if (err) {
-				res.writeHead(500);
-				return res.end('Error loading index.html');
+	switch (urlInfo.pathname) {
+		case '/':
+		case '/touchevents.html':
+			result = 'touchevents.html';
+		break;
+		case '/icon.png':
+			result = 'icon.png';
+		break;
+		case '/frame.png':
+			result = img;
+		break;
+		default:
+			console.info(req.url);
+	}
+
+	if (typeof result == 'string') {
+		fs.readFile(
+			__dirname + '/web/' + result,
+			function (err, data) {
+				if (err) { res.writeHead(500); return res.end('Error loading '+result); }
+				res.writeHead(200);
+				res.end(data);
 			}
+		);
+		return;
+	}
 
+	if (result instanceof Image) {
+		result.sendBigPNG(function (err, buf) {
 			res.writeHead(200);
-			res.end(data);
-		}
-	);
+			res.end(buf);
+		})
+		return;
+	}
 }
 
 io.sockets.on('connection', function (socket) {
@@ -127,19 +151,23 @@ m.startLoop(function () {
 
 				var sunReflection = reflectionVector[0]/Vec.vecLength(reflectionVector);
 				if (sunReflection < 0) sunReflection = 0;
-				sunReflection = Math.exp(-sqr((1-sunReflection)*20));
+				sunReflection = Math.exp(-sqr((1-sunReflection)*100));
 
-				sunReflection *= 0.5;
+				sunReflection *= 2;
 
-				var reflectionFactor = 1-(sqr(color[0]-0) + sqr(color[1]-95) + sqr(color[2]-153))/20000;
+				var reflectionFactor = 1-(
+					sqr(color[0]-  0)*0.5 - 
+					sqr(color[1]- 95)*1.0 + 
+					sqr(color[2]-153)*2.0
+				)/5000;
 				if (reflectionFactor < 0) reflectionFactor = 0;
 				sunReflection *= reflectionFactor;
 
 				var brightness = 1-Math.cos(sunStrength*Math.PI/2);
 
 				var ssr = Math.max(0, 1-sunsetFactor*0.0);
-				var ssg = Math.max(0, 1-sunsetFactor*0.3);
-				var ssb = Math.max(0, 1-sunsetFactor*0.6);
+				var ssg = Math.max(0, 1-sunsetFactor*0.2);
+				var ssb = Math.max(0, 1-sunsetFactor*0.4);
 
 				c = [
 					Math.pow((color[0]*brightness/255 + sunReflection*ssr)*ssr, gamma)*255,
@@ -164,11 +192,13 @@ function Image() {
 	var frame = 0;
 
 	var buffer = new Buffer(width*height*3);
-	var bufferBig = new Array(widthBig*heightBig*3);
+	var arrayBig = new Array(widthBig*heightBig*3);
+	var canvas = new Canvas(widthBig, heightBig);
+	var ctx = canvas.getContext('2d');
 
 	me.reset = function () {
 		var n = widthBig*heightBig*3;
-		for (var i = 0; i < n; i++) bufferBig[i] = 0;
+		for (var i = 0; i < n; i++) arrayBig[i] = 0;
 	}
 
 	me.setSubPixel = function (x0, y0, c) {
@@ -177,9 +207,9 @@ function Image() {
 		if ((y0 >= 0) && (y0 < heightBig)) {
 			if ((x0 >= 0) && (x0 < widthBig)) {
 				var i = (x0 + y0*widthBig)*3;
-				bufferBig[i+0] = c[0];
-				bufferBig[i+1] = c[1];
-				bufferBig[i+2] = c[2];
+				arrayBig[i+0] = c[0];
+				arrayBig[i+1] = c[1];
+				arrayBig[i+2] = c[2];
 			}
 		}
 	}
@@ -195,9 +225,9 @@ function Image() {
 					var x = x0 + dx;
 					if ((x >= 0) && (x < widthBig)) {
 						var i = (x + y*widthBig)*3;
-						bufferBig[i+0] = c[0];
-						bufferBig[i+1] = c[1];
-						bufferBig[i+2] = c[2];
+						arrayBig[i+0] = c[0];
+						arrayBig[i+1] = c[1];
+						arrayBig[i+2] = c[2];
 					}
 				}
 			}
@@ -207,9 +237,9 @@ function Image() {
 	var appendBuffer = new Buffer(widthBig*heightBig*3*8);
 
 	me.saveBigBuffer = function (directory) {
-		var offset = frame * bufferBig.length;
-		for (var i = 0; i < bufferBig.length; i++) {
-			c = Math.round(bufferBig[i]);
+		var offset = frame * arrayBig.length;
+		for (var i = 0; i < arrayBig.length; i++) {
+			c = Math.round(arrayBig[i]);
 			if (c <   0) c =   0;
 			if (c > 255) c = 255;
 			appendBuffer[i+offset] = c;
@@ -231,7 +261,7 @@ function Image() {
 					for (var dy = 0; dy < aa; dy++) {
 						for (var dx = 0; dx < aa; dx++) {
 							var i2 = ((x*aa+dx) + (y*aa+dy)*widthBig)*3 + c;
-							sum += bufferBig[i2];
+							sum += arrayBig[i2];
 						}
 					}
 					sum /= aa*aa;
@@ -243,6 +273,44 @@ function Image() {
 		}
 
 		return buffer;
+	}
+
+	me.sendPNG = function (cb) {
+		var n = width*height;
+		var imageData = ctx.getImageData(0, 0, width, height);
+		
+		for (var i = 0; i < n; i++) {
+			imageData.data[i*4+0] = buffer[i*3+0];
+			imageData.data[i*4+1] = buffer[i*3+1];
+			imageData.data[i*4+2] = buffer[i*3+2];
+			imageData.data[i*4+3] = 255;
+		}
+
+		ctx.putImageData(imageData, 0, 0);
+		canvas.toBuffer(cb);
+	}
+
+	me.sendBigPNG = function (cb) {
+		var n = widthBig*heightBig;
+		var imageData = ctx.getImageData(0, 0, widthBig, heightBig);
+		
+		for (var i = 0; i < n; i++) {
+			var r = Math.round(arrayBig[i*3+0]);
+			var g = Math.round(arrayBig[i*3+1]);
+			var b = Math.round(arrayBig[i*3+2]);
+
+			if (r < 0) r = 0; if (r > 255) r = 255;
+			if (g < 0) g = 0; if (g > 255) g = 255;
+			if (b < 0) b = 0; if (b > 255) b = 255;
+
+			imageData.data[i*4+0] = r;
+			imageData.data[i*4+1] = g;
+			imageData.data[i*4+2] = b;
+			imageData.data[i*4+3] = 255;
+		}
+
+		ctx.putImageData(imageData, 0, 0);
+		canvas.toBuffer(cb);
 	}
 
 	return me;
