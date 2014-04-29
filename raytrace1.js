@@ -1,6 +1,6 @@
 var app = require('http').createServer(handler);
 var io = require('socket.io').listen(app, {log:false});
-var Canvas = require('canvas');
+//var Canvas = require('canvas');
 
 var fs = require('fs');
 var url = require('url');
@@ -88,13 +88,13 @@ function setData(data, add) {
 		camRotationX += factor*data.camRotationX || 0;
 		camShiftX    += factor*data.camShiftX    || 0;
 		camShiftY    += factor*data.camShiftY    || 0;
-		camShiftZ    += factor*data.camShiftZ    || 0;
+		camShiftZ    +=        data.camShiftZ    || 0;
 	} else {
 		camRotationY = data.camRotationY || -1.2;
 		camRotationX = data.camRotationX || 0.0;
 		camShiftX    = data.camShiftX    || 0.0;
 		camShiftY    = data.camShiftY    || 0.3;
-		camShiftZ    = data.camShiftZ    || 0.235;
+		camShiftZ    = data.camShiftZ    || 0.24;
 	}
 	if (camRotationX < -pi2) camRotationX = -pi2;
 	if (camRotationX >  pi2) camRotationX =  pi2;
@@ -104,7 +104,7 @@ setData();
 
 m.startLoop(function () {
 
-	textureRotation += Math.exp(camShiftZ-6.5);
+	textureRotation += 2e-3;
 	if (textureRotation > 48*Math.PI) textureRotation -= 48*Math.PI;
 
 	img.reset();
@@ -151,9 +151,9 @@ m.startLoop(function () {
 
 				var sunReflection = reflectionVector[0]/Vec.vecLength(reflectionVector);
 				if (sunReflection < 0) sunReflection = 0;
-				sunReflection = Math.exp(-sqr((1-sunReflection)*100));
+				sunReflection = Math.exp(-sqr((1-sunReflection)*150));
 
-				sunReflection *= 2;
+				sunReflection *= 1;
 
 				var reflectionFactor = 1-(
 					sqr(color[0]-  0)*0.5 - 
@@ -193,8 +193,8 @@ function Image() {
 
 	var buffer = new Buffer(width*height*3);
 	var arrayBig = new Array(widthBig*heightBig*3);
-	var canvas = new Canvas(widthBig, heightBig);
-	var ctx = canvas.getContext('2d');
+	//var canvas = new Canvas(widthBig, heightBig);
+	//var ctx = canvas.getContext('2d');
 
 	me.reset = function () {
 		var n = widthBig*heightBig*3;
@@ -276,6 +276,7 @@ function Image() {
 	}
 
 	me.sendPNG = function (cb) {
+		/*
 		var n = width*height;
 		var imageData = ctx.getImageData(0, 0, width, height);
 		
@@ -288,9 +289,11 @@ function Image() {
 
 		ctx.putImageData(imageData, 0, 0);
 		canvas.toBuffer(cb);
+		*/
 	}
 
 	me.sendBigPNG = function (cb) {
+		/*
 		var n = widthBig*heightBig;
 		var imageData = ctx.getImageData(0, 0, widthBig, heightBig);
 		
@@ -311,6 +314,7 @@ function Image() {
 
 		ctx.putImageData(imageData, 0, 0);
 		canvas.toBuffer(cb);
+		*/
 	}
 
 	return me;
