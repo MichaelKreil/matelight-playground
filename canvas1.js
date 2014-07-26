@@ -1,4 +1,4 @@
-var canvas = new (require('matecanvas')).canvas();
+var canvas = new (require('./modules/matecanvas')).canvas();
 
 var buf = new Array(1920);
 
