@@ -1,0 +1,309 @@
+<html>
+<head>
+	<script type="text/javascript">
+		var m;
+		var Vec = new VecLib();
+
+		var width = 200;
+		var height = 100;
+
+		var textureWidth  = 5400;
+		var textureHeight = textureWidth/2;
+		var textureDay = new Array(textureWidth*textureHeight*3);//   = fs.readFileSync('data/earth.raw');
+		//for (var i = 0; i < textureWidth*textureHeight*3; i++) textureDay[i] = Math.random()*255;
+
+		var img = new Image();
+
+		var sphere = Vec.sphere([0,0,0],1);
+		var textureRotation = 0;
+		var gamma = 1.0;
+		var pi2 = Math.PI/2;
+
+		var camRotationY, camRotationX, camShiftX, camShiftY, camShiftZ;
+
+
+
+		function setData(data, add) {
+			if (!data) data = {};
+			var factor = Math.exp(camShiftZ);
+			if (add) {
+				camRotationY += factor*data.camRotationY || 0;
+				camRotationX += factor*data.camRotationX || 0;
+				camShiftX    += factor*data.camShiftX    || 0;
+				camShiftY    += factor*data.camShiftY    || 0;
+				camShiftZ    +=        data.camShiftZ    || 0;
+			} else {
+				camRotationY = data.camRotationY || -1.2;
+				camRotationX = data.camRotationX || 0.0;
+				camShiftX    = data.camShiftX    || 0.0;
+				camShiftY    = data.camShiftY    || 0.0;
+				camShiftZ    = data.camShiftZ    || 0.0;
+			}
+			if (camRotationX < -pi2) camRotationX = -pi2;
+			if (camRotationX >  pi2) camRotationX =  pi2;
+		}
+
+		setData();
+
+		function init() {
+			var body = document.getElementsByTagName('body')[0];
+			width = body.offsetWidth;
+			height = body.offsetHeight;
+
+			var textureImg = document.getElementById('texture');
+			var canvas = document.createElement('canvas');
+			canvas.width = textureWidth;
+			canvas.height = textureHeight;
+			var ctx = canvas.getContext('2d');
+			ctx.drawImage(textureImg, 0, 0);
+			textureImg = ctx.getImageData(0, 0, textureWidth, textureHeight).data;
+			for (var i = 0; i < textureWidth*textureHeight; i++) {
+				textureDay[i*3+0] = textureImg[i*4+0];
+				textureDay[i*3+1] = textureImg[i*4+1];
+				textureDay[i*3+2] = textureImg[i*4+2];
+			}
+
+			m = new Canvas();
+			setInterval(draw, 40);
+		}
+
+		function draw() {
+
+			textureRotation += 2e-3;
+			if (textureRotation > 48*Math.PI) textureRotation -= 48*Math.PI;
+
+			img.reset();
+
+			var position = Vec.vector(camShiftX, camShiftY, Math.exp(camShiftZ)+1);
+
+			position = Vec.vecRotateX(position, camRotationX);
+			position = Vec.vecRotateY(position, camRotationY + textureRotation/2);
+
+			var zoom = 30/Math.sqrt(width*height);
+
+			for (var y = 0; y < height; y++) {
+				for (var x = 0; x < width; x++) {
+					var direction = Vec.vector((x - width/2)*zoom, -(y - height/2)*zoom, -20);
+
+					direction = Vec.vecRotateX(direction, camRotationX);
+					direction = Vec.vecRotateY(direction, camRotationY + textureRotation/2);
+					
+					var c = [0,0,0];
+					var hitInfo = Vec.hitsSphere(position, direction, sphere);
+					if (hitInfo) {
+						var tx = hitInfo.texturePos[0]/Math.PI;
+						var ty = hitInfo.texturePos[1]/Math.PI;
+
+						tx = tx/2 + textureRotation/(2*Math.PI);
+						ty = ty + 1;
+						tx = Math.round(textureWidth *tx) % textureWidth;
+						ty = Math.round(textureHeight*ty) % textureHeight;
+						var ti = (tx+ty*textureWidth)*3;
+
+						
+						var color = [
+							textureDay[ti+0],
+							textureDay[ti+1],
+							textureDay[ti+2]
+						];
+
+						sunStrength = -hitInfo.normal[0];
+						if (sunStrength < 0) sunStrength = 0;
+
+						var reflectionVector = Vec.vecMult(direction, hitInfo.normal);
+						reflectionVector = Vec.vecScale(hitInfo.normal, reflectionVector);
+						reflectionVector = Vec.vecDiff(direction, reflectionVector);
+						var sunsetFactor = Vec.vecLength(reflectionVector) / Vec.vecLength(direction);
+						reflectionVector = Vec.vecScale(reflectionVector, -2);
+						reflectionVector = Vec.vecAdd(direction, reflectionVector);
+
+						var sunReflection = reflectionVector[0]/Vec.vecLength(reflectionVector);
+						if (sunReflection < 0) sunReflection = 0;
+						sunReflection = Math.exp(-sqr((1-sunReflection)*150));
+
+						sunReflection *= 1;
+
+						var reflectionFactor = 1-(
+							sqr(color[0]-  0)*0.5 - 
+							sqr(color[1]- 95)*1.0 + 
+							sqr(color[2]-153)*2.0
+						)/5000;
+						if (reflectionFactor < 0) reflectionFactor = 0;
+						sunReflection *= reflectionFactor;
+
+						var brightness = 1-Math.cos(sunStrength*Math.PI/2);
+
+						var ssr = Math.max(0, 1-sunsetFactor*0.0);
+						var ssg = Math.max(0, 1-sunsetFactor*0.2);
+						var ssb = Math.max(0, 1-sunsetFactor*0.4);
+
+						c = [
+							Math.pow((color[0]*brightness/255 + sunReflection*ssr)*ssr, gamma)*255,
+							Math.pow((color[1]*brightness/255 + sunReflection*ssg)*ssg, gamma)*255,
+							Math.pow((color[2]*brightness/255 + sunReflection*ssb)*ssb, gamma)*255
+						];
+					}
+					img.setSubPixel(x,y,c);
+				}
+			}
+			
+			//img.saveBigBuffer('frame');
+			//camRotationY -= Math.PI/8;
+			m.setBuffer(img.getBuffer());
+		};
+
+
+
+		function Image() {
+			var me = this;
+
+			var frame = 0;
+
+			var arrayBig = new Array(width*height*3);
+
+			me.reset = function () {
+				var n = width*height*3;
+				for (var i = 0; i < n; i++) arrayBig[i] = 0;
+			}
+
+			me.setSubPixel = function (x0, y0, c) {
+				x0 = Math.round(x0);
+				y0 = Math.round(y0);
+				if ((y0 >= 0) && (y0 < height)) {
+					if ((x0 >= 0) && (x0 < width)) {
+						var i = (x0 + y0*width)*3;
+						arrayBig[i+0] = c[0];
+						arrayBig[i+1] = c[1];
+						arrayBig[i+2] = c[2];
+					}
+				}
+			}
+
+			me.getBuffer = function () {
+				return arrayBig;
+			}
+
+			return me;
+		}
+
+		function VecLib() {
+			var me = this;
+
+			me.vector = function (x,y,z) {
+				return [x,y,z]
+			}
+
+			me.vecAdd = function (v0, v1) {
+				return [ v0[0]+v1[0], v0[1]+v1[1], v0[2]+v1[2] ]
+			}
+			me.vecDiff = function (v0, v1) {
+				return [ v0[0]-v1[0], v0[1]-v1[1], v0[2]-v1[2] ]
+			}
+			me.vecMult = function (v0, v1) {
+				return v0[0]*v1[0] + v0[1]*v1[1] + v0[2]*v1[2];
+			}
+			me.vecLength = function (v) {
+				return Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+			}
+			me.vecScale = function (v0, s) {
+				return [ v0[0]*s, v0[1]*s, v0[2]*s ];
+			}
+			me.vecRotateX = function (v, a) {
+				return [
+					v[0],
+					v[1]*Math.cos(a) + v[2]*Math.sin(a),
+					v[2]*Math.cos(a) - v[1]*Math.sin(a)
+				]
+			}
+			me.vecProd = function (v1, v2) {
+				return [
+					v1[1]*v2[2] - v1[2]*v2[1],
+					v1[2]*v2[0] - v1[0]*v2[2],
+					v1[0]*v2[1] - v1[1]*v2[0]
+				]
+			}
+			me.vecRotateY = function (v, a) {
+				return [
+					v[0]*Math.cos(a) + v[2]*Math.sin(a),
+					v[1],
+					v[2]*Math.cos(a) - v[0]*Math.sin(a)
+				]
+			}
+
+			me.sphere = function (center, radius) {
+				return {
+					center:center,
+					radius:radius
+				}
+			}
+
+			me.hitsSphere = function (v0, vd, sphere) {
+				//var p = me.vecDiff(v0, sphere.center);
+				var a = me.vecMult(vd, vd);
+				var b = me.vecMult(vd, me.vecScale(me.vecDiff(v0, sphere.center), 2));
+				var c = me.vecMult(sphere.center, sphere.center) + me.vecMult(v0, v0) - 2*me.vecMult(v0, sphere.center) - sphere.radius*sphere.radius;
+				var D = b*b - 4*a*c;
+				if (D <= 0) return false;
+
+				D = Math.sqrt(D);
+
+				// Ray can intersect the sphere, solve the closer hitpoint
+				var t = -(b+D)/(2*a);
+				if (t > 0) {
+					var result = {
+						distance: Math.sqrt(a)*t,
+						hitPoint: me.vecAdd(v0, me.vecScale(vd, t))
+					}
+					result.normal = me.vecScale(me.vecDiff(result.hitPoint, sphere.center), 1 / sphere.radius);
+
+					var texturePos = me.vecDiff(result.hitPoint, sphere.center);
+					result.texturePos = [
+						Math.atan2(texturePos[0], texturePos[2]),
+						Math.acos(texturePos[1] / sphere.radius)
+					]
+					return result;
+				}
+				return false;
+			}
+
+			return me;
+		}
+
+		function Canvas () {
+			var me = {};
+			var canvas = document.getElementById('screen');
+			canvas.width = width;
+			canvas.height = height;
+			var ctx = canvas.getContext('2d');
+			var image = ctx.getImageData(0,0,width,height)
+
+			me.setBuffer = function(b) {
+				for (var i = 0; i < width*height; i++) {
+					image.data[i*4+0] = b[i*3+0];
+					image.data[i*4+1] = b[i*3+1];
+					image.data[i*4+2] = b[i*3+2];
+					image.data[i*4+3] = 255;
+				}
+				ctx.putImageData(image,0,0);
+			};
+
+			return me;
+		}
+
+		function sqr(x) {
+			return x*x;
+		}
+	</script>
+	<style type="text/css">
+		html, body {
+			margin: 0;
+			height: 100%;
+		}
+	</style>
+</head>
+<body onload="init()">
+	<canvas id="screen"></canvas>
+	<img id="texture" src="earth_5400.jpg" style="display:none" />
+</body>
+</html>
+
